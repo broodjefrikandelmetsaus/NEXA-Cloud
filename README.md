@@ -9,7 +9,7 @@ Dit is de publieke statische website voor het bestaande NEXA Smart Hub-project.
 - Alleen de Supabase publishable key staat in de browser. Er staat geen service-role key of apparaatwachtwoord in deze repository.
 
 ## Belangrijk
-- De website is voorlopig read-only. Er worden nog geen opdrachten naar apparaten gestuurd.
+- De website kan beveiligde opdrachten naar de eigen NEXA-tablet sturen voor ondersteunde acties (Hue, tabletvolume/-helderheid, PS5 Wake-on-LAN, Spotify openen en Chromecast-apps).
 - De Android-tablet blijft de lokale hub die opdrachten op het thuisnetwerk uitvoert.
 - De website toont echte databasegegevens; lege tabellen blijven leeg.
 - Toegang tot gegevens is afhankelijk van Supabase Auth en de bestaande Row Level Security (RLS)-policies.
