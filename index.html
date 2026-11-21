@@ -152,10 +152,12 @@
         const roomId = String(d.external_id).slice(5);
         const power = d.reported_state?.is_on ? 'Aan' : 'Uit';
         const brightness = Math.round(Number(d.reported_state?.brightness_percent ?? 50));
-        return '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.room_name)+' · '+power+'</small></div><div class="controlrow"><button class="secondary" data-hue-power="1" data-room="'+safe(roomId)+'">Aan</button><button class="secondary" data-hue-power="0" data-room="'+safe(roomId)+'">Uit</button><label>Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label></div></div>';
+        const hueDegrees = Math.round(Number(d.reported_state?.hue_degrees ?? 34));
+        return '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.room_name)+' · '+power+'</small></div><div class="controlrow"><button class="secondary" data-hue-power="1" data-room="'+safe(roomId)+'">Aan</button><button class="secondary" data-hue-power="0" data-room="'+safe(roomId)+'">Uit</button><label>Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label><label>Kleur <input type="range" min="0" max="360" value="'+hueDegrees+'" data-hue-color data-room="'+safe(roomId)+'"></label></div></div>';
       }).join('') : '<div class="empty">Nog geen bedienbare Hue-kamers gesynchroniseerd.</div>';
       $('remoteHue').querySelectorAll('[data-hue-power]').forEach(button => button.addEventListener('click', () => sendRemoteCommand('hue_power', {value:Number(button.dataset.huePower), room_id:button.dataset.room})));
       $('remoteHue').querySelectorAll('[data-hue-brightness]').forEach(input => input.addEventListener('change', () => sendRemoteCommand('hue_brightness', {value:Number(input.value), room_id:input.dataset.room})));
+      $('remoteHue').querySelectorAll('[data-hue-color]').forEach(input => input.addEventListener('change', () => sendRemoteCommand('hue_color', {value:Number(input.value), room_id:input.dataset.room})));
       const integrations = integrationsRes.data || [];
       setList('integrations', integrations.filter(i => i.provider !== 'google_tv_remote'), i => '<div class="item"><div><strong>'+safe(i.display_name || i.provider)+'</strong><small>'+safe(i.provider)+'</small></div><span class="status">'+safe(i.connection_status)+'</span></div>', 'Nog geen integraties gekoppeld.');
       document.querySelectorAll('[data-cast]').forEach(button => {
