@@ -22,6 +22,7 @@
     input{width:100%;padding:12px 13px;border-radius:11px;border:1px solid var(--line);background:#0e131d;color:var(--text);outline:none}input:focus{border-color:var(--orange)}
     label{display:grid;gap:6px;color:var(--muted);font-size:13px}.form{max-width:420px;display:grid;gap:12px}.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
     .hidden{display:none!important}.notice{margin-top:14px;color:var(--muted);font-size:12px}.error{color:#ff9ba3}.oktext{color:#7ce0ae}
+    input[type=range]{accent-color:var(--orange);padding:0;min-width:140px}.controlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.controlrow button{padding:8px 12px;font-size:12px}.controlrow input[type=range]{max-width:210px}
     footer{padding-top:22px;color:#748095;font-size:12px;text-align:center}
     @media(max-width:760px){.wide,.narrow,.half{grid-column:1/-1}.top{align-items:flex-start}.pill{max-width:140px;text-align:center}}
   </style>
@@ -65,6 +66,28 @@
         </article>
         <article class="card half"><h3>Apparatenoverzicht</h3><div class="list" id="devices"><div class="empty">Nog geen apparaten gevonden.</div></div></article>
         <article class="card half"><h3>Integraties</h3><div class="list" id="integrations"><div class="empty">Nog geen integraties gekoppeld.</div></div></article>
+        <article class="card full">
+          <h3>Bediening op afstand</h3>
+          <p class="muted" style="font-size:12px;margin-top:-6px">Opdrachten lopen via je eigen NEXA-tablet. De tablet moet online zijn en NEXA moet actief zijn.</p>
+          <div id="remoteStatus" class="notice">Wachten op NEXA-hub…</div>
+          <h3 style="margin-top:18px">Philips Hue · kamers</h3>
+          <div class="list" id="remoteHue"><div class="empty">Nog geen Hue-kamers gesynchroniseerd.</div></div>
+          <div class="controlrow" style="margin-top:14px">
+            <label style="min-width:190px">Tabletvolume <input id="cloudVolume" type="range" min="0" max="100" value="30"></label>
+            <label style="min-width:190px">Schermhelderheid <input id="cloudBrightness" type="range" min="1" max="100" value="70"></label>
+          </div>
+          <div class="controlrow" style="margin-top:12px">
+            <button class="secondary" data-remote="open_spotify">Spotify openen op tablet</button>
+            <button class="secondary" data-remote="wake_ps5">PS5 wakker maken</button>
+            <button class="secondary" data-remote="open_wifi_panel">Wifi-instellingen openen</button>
+          </div>
+          <div class="controlrow" style="margin-top:12px">
+            <button class="secondary" data-cast="https://www.youtube.com">YouTube op Chromecast</button>
+            <button class="secondary" data-cast="https://www.netflix.com">Netflix op Chromecast</button>
+            <button class="secondary" data-cast="https://www.disneyplus.com">Disney+ op Chromecast</button>
+            <button class="secondary" data-cast="https://www.videoland.com">Videoland op Chromecast</button>
+          </div>
+        </article>
         <article class="card full"><h3>Scènes</h3><div class="list" id="scenes"><div class="empty">Nog geen scènes beschikbaar.</div></div></article>
       </div>
       <p class="notice" id="lastRefresh">Nog niet bijgewerkt.</p>
@@ -81,6 +104,8 @@
     });
     const $ = (id) => document.getElementById(id);
     let refreshTimer;
+    let currentHubDeviceId = null;
+    let hubOnline = false;
     const safe = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const show = (id, yes) => $(id).classList.toggle('hidden', !yes);
     function setMessage(text, error=false) {
@@ -101,27 +126,83 @@
       if (!user) return;
       const [hubRes, devicesRes, integrationsRes, scenesRes] = await Promise.all([
         supabase.from('nexa_hub_devices').select('device_id,device_name,reported_state,last_seen_at').eq('user_id', user.id).maybeSingle(),
-        supabase.from('devices').select('id,display_name,provider,category,room_name,connection_state').eq('user_id', user.id).order('display_name'),
+        supabase.from('devices').select('id,display_name,provider,external_id,category,room_name,connection_state,reported_state').eq('user_id', user.id).order('display_name'),
         supabase.from('integration_connections').select('id,provider,display_name,connection_status,last_checked_at').eq('user_id', user.id).order('display_name'),
         supabase.from('scenes').select('id,name,icon,is_enabled,sort_order').eq('user_id', user.id).order('sort_order')
       ]);
       const firstError = [hubRes,devicesRes,integrationsRes,scenesRes].find(r=>r.error)?.error;
       if (firstError) throw firstError;
       const hub = hubRes.data;
+      currentHubDeviceId = hub?.device_id || null;
       $('hubName').textContent = hub?.device_name || 'Nog niet gekoppeld';
       const online = !!hub?.last_seen_at && (Date.now() - new Date(hub.last_seen_at).getTime()) <= 60000;
+      hubOnline = online;
+      $('remoteStatus').textContent = online ? 'Hub online · opdrachten kunnen worden verstuurd.' : 'Hub offline · open NEXA op de tablet en controleer de internetverbinding.';
+      $('remoteStatus').className = 'notice ' + (online ? 'oktext' : 'error');
       $('hubDot').className = 'dot ' + (online ? 'ok' : (hub ? 'bad' : ''));
       $('hubStatus').textContent = online ? 'Online · cloudverbinding actief' : (hub ? 'Offline · laatste heartbeat ouder dan 60 sec.' : 'Nog niet gekoppeld');
       $('hubSeen').textContent = timeAgo(hub?.last_seen_at);
       const devices = devicesRes.data || [];
       $('deviceCount').textContent = devices.length;
       setList('devices', devices, d => '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.provider)+' · '+safe(d.room_name || d.category)+'</small></div><span class="status"><span class="dot '+(d.connection_state==='online'?'ok':d.connection_state==='offline'?'bad':'')+'"></span>'+safe(d.connection_state)+'</span></div>', 'Nog geen apparaten geregistreerd.');
+      const hueRooms = devices.filter(d => d.provider === 'philips_hue' && String(d.external_id || '').startsWith('room:') && d.reported_state?.grouped_light_available);
+      $('remoteHue').innerHTML = hueRooms.length ? hueRooms.map(d => {
+        const roomId = String(d.external_id).slice(5);
+        const power = d.reported_state?.is_on ? 'Aan' : 'Uit';
+        const brightness = Math.round(Number(d.reported_state?.brightness_percent ?? 50));
+        return '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.room_name)+' · '+power+'</small></div><div class="controlrow"><button class="secondary" data-hue-power="1" data-room="'+safe(roomId)+'">Aan</button><button class="secondary" data-hue-power="0" data-room="'+safe(roomId)+'">Uit</button><label>Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label></div></div>';
+      }).join('') : '<div class="empty">Nog geen bedienbare Hue-kamers gesynchroniseerd.</div>';
+      $('remoteHue').querySelectorAll('[data-hue-power]').forEach(button => button.addEventListener('click', () => sendRemoteCommand('hue_power', {value:Number(button.dataset.huePower), room_id:button.dataset.room})));
+      $('remoteHue').querySelectorAll('[data-hue-brightness]').forEach(input => input.addEventListener('change', () => sendRemoteCommand('hue_brightness', {value:Number(input.value), room_id:input.dataset.room})));
       const integrations = integrationsRes.data || [];
       setList('integrations', integrations, i => '<div class="item"><div><strong>'+safe(i.display_name || i.provider)+'</strong><small>'+safe(i.provider)+'</small></div><span class="status">'+safe(i.connection_status)+'</span></div>', 'Nog geen integraties gekoppeld.');
+      document.querySelectorAll('[data-cast]').forEach(button => {
+        const paired = integrations.some(i => i.provider === 'google_tv_remote' && i.connection_status === 'connected');
+        button.disabled = !paired || !online;
+        button.title = paired ? 'Start op gekoppelde Chromecast' : 'Chromecast eerst koppelen op de tablet';
+        button.onclick = () => sendRemoteCommand('launch_chromecast_app', {app_link:button.dataset.cast});
+      });
+      document.querySelectorAll('[data-remote]').forEach(button => {
+        button.disabled = !online;
+        button.onclick = () => sendRemoteCommand(button.dataset.remote, {});
+      });
       const scenes = scenesRes.data || [];
       setList('scenes', scenes, s => '<div class="item"><div><strong>'+safe(s.icon)+' &nbsp;'+safe(s.name)+'</strong><small>'+(s.is_enabled?'Ingeschakeld':'Uitgeschakeld')+'</small></div></div>', 'Nog geen scènes beschikbaar.');
       $('lastRefresh').textContent = 'Laatst bijgewerkt: ' + new Date().toLocaleTimeString('nl-NL');
     }
+    async function sendRemoteCommand(commandType, payload = {}) {
+      if (!currentHubDeviceId || !hubOnline) {
+        $('remoteStatus').textContent = 'NEXA-tablet is offline. Open de app en probeer opnieuw.';
+        $('remoteStatus').className = 'notice error';
+        return;
+      }
+      $('remoteStatus').textContent = 'Opdracht versturen…';
+      $('remoteStatus').className = 'notice';
+      const { data, error } = await supabase.from('nexa_remote_commands').insert({
+        target_device_id: currentHubDeviceId, command_type: commandType, payload, status: 'pending'
+      }).select('id').single();
+      if (error) {
+        $('remoteStatus').textContent = 'Opdracht geweigerd: ' + error.message;
+        $('remoteStatus').className = 'notice error';
+        return;
+      }
+      $('remoteStatus').textContent = 'Opdracht verzonden · wachten op tablet…';
+      for (let attempt = 0; attempt < 15; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const { data: row, error: readError } = await supabase.from('nexa_remote_commands')
+          .select('status,result_message').eq('id', data.id).maybeSingle();
+        if (readError) break;
+        if (row && ['completed','failed'].includes(row.status)) {
+          $('remoteStatus').textContent = (row.status === 'completed' ? '✓ ' : '✕ ') + (row.result_message || row.status);
+          $('remoteStatus').className = 'notice ' + (row.status === 'completed' ? 'oktext' : 'error');
+          return;
+        }
+      }
+      $('remoteStatus').textContent = 'Nog geen antwoord ontvangen. Controleer of NEXA open en verbonden is.';
+      $('remoteStatus').className = 'notice error';
+    }
+    $('cloudVolume').addEventListener('change', event => sendRemoteCommand('set_volume', {value:Number(event.target.value)}));
+    $('cloudBrightness').addEventListener('change', event => sendRemoteCommand('set_brightness', {value:Number(event.target.value)}));
     async function syncAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       const loggedIn = !!session;
