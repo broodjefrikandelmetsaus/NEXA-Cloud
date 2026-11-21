@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131b">
+  <title>NEXA Cloud</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0c0f16;--panel:#151a25;--panel2:#1b2230;--line:#293244;--text:#f4f6fb;--muted:#9aa6b8;--orange:#ff8a32;--green:#45c48b;--red:#ff6875}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 12% 0%,#272039 0,transparent 40%),var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+    .wrap{max-width:1100px;margin:auto;padding:28px 20px 60px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}
+    .brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,#ffb15c,#f36b28);display:grid;place-items:center;color:#21140b;font-weight:900;font-size:23px;box-shadow:0 8px 30px #ff8a3230}
+    h1{font-size:24px;line-height:1.1;margin:0}.sub{color:var(--muted);font-size:13px}.pill{border:1px solid var(--line);border-radius:999px;padding:7px 12px;color:var(--muted);font-size:12px}
+    .hero{background:linear-gradient(135deg,#1c2432,#171b28);border:1px solid var(--line);border-radius:22px;padding:24px;margin-bottom:18px}
+    .hero h2{font-size:clamp(24px,4vw,34px);margin:0 0 6px}.hero p{margin:0;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0}.wide{grid-column:span 8}.narrow{grid-column:span 4}.half{grid-column:span 6}.full{grid-column:1/-1}
+    .card h3{margin:0 0 14px;font-size:16px}.big{font-size:28px;font-weight:750;letter-spacing:-.04em}.muted{color:var(--muted)}.status{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+    .dot{width:8px;height:8px;border-radius:50%;background:#7b8494}.dot.ok{background:var(--green);box-shadow:0 0 12px #45c48b70}.dot.bad{background:var(--red)}
+    .list{display:grid;gap:9px}.item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;background:var(--panel2);border:1px solid #252d3c;border-radius:12px}.item strong{display:block;font-size:14px}.item small{color:var(--muted)}
+    .empty{padding:18px;text-align:center;color:var(--muted);background:var(--panel2);border-radius:12px}
+    button,input{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:11px 15px;background:var(--orange);color:#21140b;font-weight:750}button.secondary{background:#293244;color:var(--text);border:1px solid #374257}
+    input{width:100%;padding:12px 13px;border-radius:11px;border:1px solid var(--line);background:#0e131d;color:var(--text);outline:none}input:focus{border-color:var(--orange)}
+    label{display:grid;gap:6px;color:var(--muted);font-size:13px}.form{max-width:420px;display:grid;gap:12px}.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+    .hidden{display:none!important}.notice{margin-top:14px;color:var(--muted);font-size:12px}.error{color:#ff9ba3}.oktext{color:#7ce0ae}
+    footer{padding-top:22px;color:#748095;font-size:12px;text-align:center}
+    @media(max-width:760px){.wide,.narrow,.half{grid-column:1/-1}.top{align-items:flex-start}.pill{max-width:140px;text-align:center}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="brand"><div class="logo">N</div><div><h1>NEXA Cloud</h1><div class="sub">Je huis. Eén slim overzicht.</div></div></div>
+      <div class="pill" id="connection">Controleren…</div>
+    </header>
+
+    <section class="hero">
+      <h2>Alles verbonden. Alles overzichtelijk.</h2>
+      <p>Cloudstatus en synchronisatie van jouw NEXA-hub.</p>
+    </section>
+
+    <section id="auth" class="card">
+      <h3>Inloggen bij NEXA</h3>
+      <form id="authForm" class="form">
+        <label>E-mailadres<input id="email" type="email" autocomplete="username" required placeholder="jij@voorbeeld.nl"></label>
+        <label>Wachtwoord<input id="password" type="password" autocomplete="current-password" minlength="6" required placeholder="Je NEXA-wachtwoord"></label>
+        <div class="actions"><button type="submit">Inloggen</button><button class="secondary" type="button" id="signup">Account aanmaken</button></div>
+      </form>
+      <p id="authMessage" class="notice" role="status">Gebruik hetzelfde NEXA-account als op je Android-app.</p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="actions" style="justify-content:space-between;margin:0 0 14px">
+        <span class="muted" id="signedIn"></span>
+        <div class="actions"><button class="secondary" id="refresh">Vernieuwen</button><button class="secondary" id="logout">Uitloggen</button></div>
+      </div>
+      <div class="grid">
+        <article class="card wide">
+          <h3>Lokale NEXA-hub</h3>
+          <div class="big" id="hubName">Nog niet gekoppeld</div>
+          <div class="status" style="margin-top:7px"><span class="dot" id="hubDot"></span><span id="hubStatus">Wachten op gegevens</span></div>
+          <p class="muted" id="hubSeen" style="font-size:12px;margin:12px 0 0">De tablet meldt zich bij de cloud wanneer NEXA actief en online is.</p>
+        </article>
+        <article class="card narrow">
+          <h3>Apparaten</h3><div class="big" id="deviceCount">—</div><div class="muted">Geregistreerd in NEXA</div>
+        </article>
+        <article class="card half"><h3>Apparatenoverzicht</h3><div class="list" id="devices"><div class="empty">Nog geen apparaten gevonden.</div></div></article>
+        <article class="card half"><h3>Integraties</h3><div class="list" id="integrations"><div class="empty">Nog geen integraties gekoppeld.</div></div></article>
+        <article class="card full"><h3>Scènes</h3><div class="list" id="scenes"><div class="empty">Nog geen scènes beschikbaar.</div></div></article>
+      </div>
+      <p class="notice" id="lastRefresh">Nog niet bijgewerkt.</p>
+    </section>
+    <footer>NEXA Cloud · Alleen jouw eigen gegevens zijn zichtbaar na inloggen. Apparaatbediening via deze website wordt pas ingeschakeld nadat de commandobeveiliging is getest.</footer>
+  </main>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const SUPABASE_URL = 'https://kxzhvdkcumijirjcexti.supabase.co';
+    // Publishable client key only. Row access is restricted by Supabase Auth + RLS.
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Aad7-JXA3zX1R3KmOW4hmw_4segwHVz';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    const $ = (id) => document.getElementById(id);
+    let refreshTimer;
+    const safe = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const show = (id, yes) => $(id).classList.toggle('hidden', !yes);
+    function setMessage(text, error=false) {
+      $('authMessage').textContent = text;
+      $('authMessage').className = 'notice' + (error ? ' error' : '');
+    }
+    function setList(id, rows, renderer, empty) {
+      $(id).innerHTML = rows.length ? rows.map(renderer).join('') : '<div class="empty">'+safe(empty)+'</div>';
+    }
+    function timeAgo(value) {
+      if (!value) return 'Nog geen heartbeat ontvangen';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Onbekend';
+      return 'Laatst gezien: ' + date.toLocaleString('nl-NL');
+    }
+    async function loadDashboard() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [hubRes, devicesRes, integrationsRes, scenesRes] = await Promise.all([
+        supabase.from('nexa_hub_devices').select('device_id,device_name,reported_state,last_seen_at').eq('user_id', user.id).maybeSingle(),
+        supabase.from('devices').select('id,display_name,provider,category,room_name,connection_state').eq('user_id', user.id).order('display_name'),
+        supabase.from('integration_connections').select('id,provider,display_name,connection_status,last_checked_at').eq('user_id', user.id).order('display_name'),
+        supabase.from('scenes').select('id,name,icon,is_enabled,sort_order').eq('user_id', user.id).order('sort_order')
+      ]);
+      const firstError = [hubRes,devicesRes,integrationsRes,scenesRes].find(r=>r.error)?.error;
+      if (firstError) throw firstError;
+      const hub = hubRes.data;
+      $('hubName').textContent = hub?.device_name || 'Nog niet gekoppeld';
+      const online = !!hub?.last_seen_at && (Date.now() - new Date(hub.last_seen_at).getTime()) <= 60000;
+      $('hubDot').className = 'dot ' + (online ? 'ok' : (hub ? 'bad' : ''));
+      $('hubStatus').textContent = online ? 'Online · cloudverbinding actief' : (hub ? 'Offline · laatste heartbeat ouder dan 60 sec.' : 'Nog niet gekoppeld');
+      $('hubSeen').textContent = timeAgo(hub?.last_seen_at);
+      const devices = devicesRes.data || [];
+      $('deviceCount').textContent = devices.length;
+      setList('devices', devices, d => '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.provider)+' · '+safe(d.room_name || d.category)+'</small></div><span class="status"><span class="dot '+(d.connection_state==='online'?'ok':d.connection_state==='offline'?'bad':'')+'"></span>'+safe(d.connection_state)+'</span></div>', 'Nog geen apparaten geregistreerd.');
+      const integrations = integrationsRes.data || [];
+      setList('integrations', integrations, i => '<div class="item"><div><strong>'+safe(i.display_name || i.provider)+'</strong><small>'+safe(i.provider)+'</small></div><span class="status">'+safe(i.connection_status)+'</span></div>', 'Nog geen integraties gekoppeld.');
+      const scenes = scenesRes.data || [];
+      setList('scenes', scenes, s => '<div class="item"><div><strong>'+safe(s.icon)+' &nbsp;'+safe(s.name)+'</strong><small>'+(s.is_enabled?'Ingeschakeld':'Uitgeschakeld')+'</small></div></div>', 'Nog geen scènes beschikbaar.');
+      $('lastRefresh').textContent = 'Laatst bijgewerkt: ' + new Date().toLocaleTimeString('nl-NL');
+    }
+    async function syncAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const loggedIn = !!session;
+      show('auth', !loggedIn); show('dashboard', loggedIn);
+      if (loggedIn) {
+        $('signedIn').textContent = 'Ingelogd als ' + (session.user.email || 'NEXA-gebruiker');
+        try { await loadDashboard(); } catch (e) { $('lastRefresh').textContent = 'Fout bij laden: ' + (e.message || e); }
+        clearInterval(refreshTimer);
+        refreshTimer = setInterval(() => loadDashboard().catch(e => $('lastRefresh').textContent = 'Fout bij vernieuwen: '+(e.message || e)), 15000);
+      } else clearInterval(refreshTimer);
+    }
+    $('authForm').addEventListener('submit', async (event) => {
+      event.preventDefault(); setMessage('Bezig met inloggen…');
+      const { error } = await supabase.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value });
+      if (error) return setMessage(error.message, true);
+      setMessage('Ingelogd.');
+    });
+    $('signup').addEventListener('click', async () => {
+      setMessage('Account aanmaken…');
+      const { data, error } = await supabase.auth.signUp({ email: $('email').value.trim(), password: $('password').value });
+      if (error) return setMessage(error.message, true);
+      setMessage(data.session ? 'Account aangemaakt en ingelogd.' : 'Account aangemaakt. Check je e-mail om je account te bevestigen.');
+    });
+    $('logout').addEventListener('click', async () => { await supabase.auth.signOut(); });
+    $('refresh').addEventListener('click', () => loadDashboard().catch(e => $('lastRefresh').textContent = 'Fout: '+(e.message || e)));
+    $('connection').textContent = navigator.onLine ? 'Cloud bereikbaar via internet' : 'Geen internetverbinding';
+    window.addEventListener('online', () => $('connection').textContent = 'Cloud bereikbaar via internet');
+    window.addEventListener('offline', () => $('connection').textContent = 'Geen internetverbinding');
+    supabase.auth.onAuthStateChange(() => setTimeout(syncAuth, 0));
+    await syncAuth();
+  </script>
+</body>
+</html>
