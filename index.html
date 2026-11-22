@@ -191,7 +191,7 @@
       };
       const renderHueLamp = light => {
         const state = light.reported_state || {};
-        const lightId = String(light.external_id).slice(6);
+        const lightId = String(light.external_id).split(':').slice(2).join(':');
         const power = state.is_on ? 'Aan' : 'Uit';
         const brightness = Math.round(Number(state.brightness_percent ?? 50));
         const controls = [
@@ -209,7 +209,7 @@
         const state = d.reported_state || {};
         const power = state.is_on ? 'Aan' : 'Uit';
         const brightness = Math.round(Number(state.brightness_percent ?? 50));
-        const members = hueLights.filter(light => light.room_name === d.display_name);
+        const members = hueLights.filter(light => String(light.external_id).startsWith('light:'+roomId+':'));
         const groupControls = [
           '<label class="hue-control">Helderheid hele groep <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label>'
         ];
