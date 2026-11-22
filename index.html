@@ -194,9 +194,10 @@
         const lightId = String(light.external_id).split(':').slice(2).join(':');
         const power = state.is_on ? 'Aan' : 'Uit';
         const brightness = Math.round(Number(state.brightness_percent ?? 50));
-        const controls = [
-          '<label class="hue-control">Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-light="'+safe(lightId)+'"></label>'
-        ];
+        const controls = [];
+        if (state.supports_brightness) {
+          controls.push('<label class="hue-control">Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-light="'+safe(lightId)+'"></label>');
+        }
         if (state.supports_color) {
           controls.push('<label class="hue-control">Kleur <input type="color" value="'+hueColorFromDegrees(state.hue_degrees)+'" data-hue-color data-light="'+safe(lightId)+'"></label>');
         }
@@ -210,9 +211,10 @@
         const power = state.is_on ? 'Aan' : 'Uit';
         const brightness = Math.round(Number(state.brightness_percent ?? 50));
         const members = hueLights.filter(light => String(light.external_id).startsWith('light:'+roomId+':'));
-        const groupControls = [
-          '<label class="hue-control">Helderheid hele groep <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label>'
-        ];
+        const groupControls = [];
+        if (state.supports_brightness) {
+          groupControls.push('<label class="hue-control">Helderheid hele groep <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label>');
+        }
         if (state.supports_color) {
           groupControls.push('<label class="hue-control">Kleur hele groep <input type="color" value="'+hueColorFromDegrees(state.hue_degrees)+'" data-hue-color data-room="'+safe(roomId)+'"></label>');
         }
