@@ -25,7 +25,22 @@
     input[type=range]{accent-color:var(--orange);padding:0;min-width:140px}.controlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.controlrow button{padding:8px 12px;font-size:12px}.controlrow input[type=range]{max-width:210px}
     footer{padding-top:22px;color:#748095;font-size:12px;text-align:center}
     @media(max-width:760px){.wide,.narrow,.half{grid-column:1/-1}.top{align-items:flex-start}.pill{max-width:140px;text-align:center}}
-  </style>
+      .hue-room{border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:0;background:rgba(255,255,255,.035);overflow:hidden;margin:10px 0}
+    .hue-room summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px}
+    .hue-room summary::-webkit-details-marker{display:none}
+    .hue-room summary strong,.hue-lamp strong{display:block}
+    .hue-room summary small,.hue-lamp small{display:block;color:var(--muted,#aaa);font-size:11px;margin-top:3px}
+    .hue-chevron{font-size:20px;transition:transform .2s}
+    .hue-room[open] .hue-chevron{transform:rotate(180deg)}
+    .hue-room-content{padding:0 14px 14px}
+    .hue-group-head,.hue-lamp-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .hue-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:12px 0}
+    .hue-control{display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}
+    .hue-control input[type=range]{width:100%}
+    .hue-control input[type=color]{width:100%;height:38px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:transparent;padding:3px}
+    .hue-lamps-title{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted,#aaa);font-weight:700;margin:18px 0 8px}
+    .hue-lamp{padding:12px;margin-top:8px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)}
+\n  </style>
 </head>
 <body>
   <main class="wrap">
@@ -147,17 +162,93 @@
       const devices = allDevices.filter(d => d.provider !== 'google_tv_remote');
       $('deviceCount').textContent = devices.length;
       setList('devices', devices, d => '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.provider)+' · '+safe(d.room_name || d.category)+'</small></div><span class="status"><span class="dot '+(d.connection_state==='online'?'ok':d.connection_state==='offline'?'bad':'')+'"></span>'+safe(d.connection_state)+'</span></div>', 'Nog geen apparaten geregistreerd.');
-      const hueRooms = allDevices.filter(d => d.provider === 'philips_hue' && String(d.external_id || '').startsWith('room:') && d.reported_state?.grouped_light_available);
+      const hueRooms = allDevices.filter(d =>
+        d.provider === 'philips_hue' &&
+        (String(d.external_id || '').startsWith('room:') || String(d.external_id || '').startsWith('zone:')) &&
+        d.reported_state?.grouped_light_available &&
+        !String(d.display_name || '').toLowerCase().includes('smart plug')
+      );
+      const hueLights = allDevices.filter(d =>
+        d.provider === 'philips_hue' &&
+        String(d.external_id || '').startsWith('light:') &&
+        !String(d.display_name || '').toLowerCase().includes('smart plug')
+      );
+      const hueColorFromDegrees = degrees => {
+        const h = Number(degrees || 0);
+        const channel = n => {
+          const k = (n + h / 30) % 12;
+          const a = 0.9 * Math.min(k, 12 - k, 1);
+          return Math.round(255 * (1 - a)).toString(16).padStart(2, '0');
+        };
+        return '#' + channel(0) + channel(8) + channel(4);
+      };
+      const renderHueTemperature = (state, target) => {
+        if (!state.supports_color_temperature) return '';
+        const min = Number(state.min_mirek || 153);
+        const max = Number(state.max_mirek || 500);
+        const mirek = Math.max(min, Math.min(max, Number(state.mirek || Math.round((min + max) / 2))));
+        return '<label class="hue-control">Witlicht · kleurtemperatuur <input type="range" min="'+min+'" max="'+max+'" value="'+mirek+'" data-hue-temp '+target+'><small class="muted">'+Math.round(1000000 / mirek)+' K</small></label>';
+      };
+      const renderHueLamp = light => {
+        const state = light.reported_state || {};
+        const lightId = String(light.external_id).slice(6);
+        const power = state.is_on ? 'Aan' : 'Uit';
+        const brightness = Math.round(Number(state.brightness_percent ?? 50));
+        const controls = [
+          '<label class="hue-control">Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-light="'+safe(lightId)+'"></label>'
+        ];
+        if (state.supports_color) {
+          controls.push('<label class="hue-control">Kleur <input type="color" value="'+hueColorFromDegrees(state.hue_degrees)+'" data-hue-color data-light="'+safe(lightId)+'"></label>');
+        }
+        const temperature = renderHueTemperature(state, 'data-light="'+safe(lightId)+'"');
+        if (temperature) controls.push(temperature);
+        return '<div class="hue-lamp"><div class="hue-lamp-head"><div><strong>'+safe(light.display_name)+'</strong><small>'+power+(state.supports_color?' · kleur':'')+(state.supports_color_temperature?' · witlicht':'')+'</small></div><div class="controlrow"><button class="secondary" data-hue-power="1" data-light="'+safe(lightId)+'">Aan</button><button class="secondary" data-hue-power="0" data-light="'+safe(lightId)+'">Uit</button></div></div><div class="hue-controls">'+controls.join('')+'</div></div>';
+      };
       $('remoteHue').innerHTML = hueRooms.length ? hueRooms.map(d => {
         const roomId = String(d.external_id).slice(5);
-        const power = d.reported_state?.is_on ? 'Aan' : 'Uit';
-        const brightness = Math.round(Number(d.reported_state?.brightness_percent ?? 50));
-        const hueDegrees = Math.round(Number(d.reported_state?.hue_degrees ?? 34));
-        return '<div class="item"><div><strong>'+safe(d.display_name)+'</strong><small>'+safe(d.room_name)+' · '+power+'</small></div><div class="controlrow"><button class="secondary" data-hue-power="1" data-room="'+safe(roomId)+'">Aan</button><button class="secondary" data-hue-power="0" data-room="'+safe(roomId)+'">Uit</button><label>Helderheid <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label><label>Kleur <input type="range" min="0" max="360" value="'+hueDegrees+'" data-hue-color data-room="'+safe(roomId)+'"></label></div></div>';
-      }).join('') : '<div class="empty">Nog geen bedienbare Hue-kamers gesynchroniseerd.</div>';
-      $('remoteHue').querySelectorAll('[data-hue-power]').forEach(button => button.addEventListener('click', () => sendRemoteCommand('hue_power', {value:Number(button.dataset.huePower), room_id:button.dataset.room})));
-      $('remoteHue').querySelectorAll('[data-hue-brightness]').forEach(input => input.addEventListener('change', () => sendRemoteCommand('hue_brightness', {value:Number(input.value), room_id:input.dataset.room})));
-      $('remoteHue').querySelectorAll('[data-hue-color]').forEach(input => input.addEventListener('change', () => sendRemoteCommand('hue_color', {value:Number(input.value), room_id:input.dataset.room})));
+        const state = d.reported_state || {};
+        const power = state.is_on ? 'Aan' : 'Uit';
+        const brightness = Math.round(Number(state.brightness_percent ?? 50));
+        const members = hueLights.filter(light => light.room_name === d.display_name);
+        const groupControls = [
+          '<label class="hue-control">Helderheid hele groep <input type="range" min="1" max="100" value="'+brightness+'" data-hue-brightness data-room="'+safe(roomId)+'"></label>'
+        ];
+        if (state.supports_color) {
+          groupControls.push('<label class="hue-control">Kleur hele groep <input type="color" value="'+hueColorFromDegrees(state.hue_degrees)+'" data-hue-color data-room="'+safe(roomId)+'"></label>');
+        }
+        const groupTemperature = renderHueTemperature(state, 'data-room="'+safe(roomId)+'"');
+        if (groupTemperature) groupControls.push(groupTemperature);
+        return '<details class="hue-room"><summary><span><strong>'+safe(d.display_name)+'</strong><small>'+safe(state.resource_type === 'zone' ? 'Groep' : 'Kamer')+' · '+members.length+' lamp(en) · '+power+'</small></span><span class="hue-chevron">⌄</span></summary><div class="hue-room-content"><div class="hue-group-head"><strong>Hele '+safe(state.resource_type === 'zone' ? 'groep' : 'kamer')+'</strong><div class="controlrow"><button class="secondary" data-hue-power="1" data-room="'+safe(roomId)+'">Alles aan</button><button class="secondary" data-hue-power="0" data-room="'+safe(roomId)+'">Alles uit</button></div></div><div class="hue-controls">'+groupControls.join('')+'</div><div class="hue-lamps-title">Individuele lampen</div>'+(members.length ? members.map(renderHueLamp).join('') : '<div class="empty">Geen losse Hue-lampen in deze kamer gevonden.</div>')+'</div></details>';
+      }).join('') : '<div class="empty">Nog geen Hue-kamers of groepen gesynchroniseerd.</div>';
+      $('remoteHue').querySelectorAll('[data-hue-power]').forEach(button => button.addEventListener('click', () => {
+        const target = button.dataset.light ? {light_id:button.dataset.light} : {room_id:button.dataset.room};
+        sendRemoteCommand('hue_power', {...target, value:Number(button.dataset.huePower)});
+      }));
+      $('remoteHue').querySelectorAll('[data-hue-brightness]').forEach(input => input.addEventListener('change', () => {
+        const target = input.dataset.light ? {light_id:input.dataset.light} : {room_id:input.dataset.room};
+        sendRemoteCommand('hue_brightness', {...target, value:Number(input.value)});
+      }));
+      const hueToDegrees = hex => {
+        const value = hex.replace('#','');
+        const r = parseInt(value.slice(0,2),16)/255;
+        const g = parseInt(value.slice(2,4),16)/255;
+        const b = parseInt(value.slice(4,6),16)/255;
+        const max = Math.max(r,g,b), min = Math.min(r,g,b), delta = max-min;
+        if (!delta) return 0;
+        let h;
+        if (max === r) h = ((g-b)/delta)%6;
+        else if (max === g) h = (b-r)/delta+2;
+        else h = (r-g)/delta+4;
+        return Math.round((h*60+360)%360);
+      };
+      $('remoteHue').querySelectorAll('[data-hue-color]').forEach(input => input.addEventListener('change', () => {
+        const target = input.dataset.light ? {light_id:input.dataset.light} : {room_id:input.dataset.room};
+        sendRemoteCommand('hue_color', {...target, value:hueToDegrees(input.value)});
+      }));
+      $('remoteHue').querySelectorAll('[data-hue-temp]').forEach(input => input.addEventListener('change', () => {
+        const target = input.dataset.light ? {light_id:input.dataset.light} : {room_id:input.dataset.room};
+        sendRemoteCommand('hue_color', {...target, mirek:Number(input.value), value:0});
+      }));
       const integrations = integrationsRes.data || [];
       setList('integrations', integrations.filter(i => i.provider !== 'google_tv_remote'), i => '<div class="item"><div><strong>'+safe(i.display_name || i.provider)+'</strong><small>'+safe(i.provider)+'</small></div><span class="status">'+safe(i.connection_status)+'</span></div>', 'Nog geen integraties gekoppeld.');
       document.querySelectorAll('[data-cast]').forEach(button => {
